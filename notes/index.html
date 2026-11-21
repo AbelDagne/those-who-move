@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#000000">
+<meta name="robots" content="noindex">
+<title>Talk Notes</title>
+<style>
+  :root { --bg:#000; --fg:#f4f4f2; --dim:#8a8a86; --line:#2a2a28; --accent:#ffb347; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--fg); overflow:hidden;
+    font-family:-apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif;
+    -webkit-user-select:none; user-select:none; touch-action:manipulation; overscroll-behavior:none; }
+  #app { position:fixed; inset:0; display:flex; flex-direction:column;
+    padding:calc(env(safe-area-inset-top) + 14px) 22px calc(env(safe-area-inset-bottom) + 14px); }
+  #bar { display:flex; gap:5px; height:5px; flex:none; }
+  #bar i { flex:1; border-radius:3px; background:var(--line); }
+  #bar i.done { background:var(--dim); }
+  #bar i.on { background:var(--accent); }
+  #top { display:flex; justify-content:space-between; align-items:baseline; flex:none;
+    margin-top:14px; font-size:15px; color:var(--dim); font-variant-numeric:tabular-nums; letter-spacing:.04em; }
+  #title { flex:none; margin:10px 0 0; font-size:22px; font-weight:800; letter-spacing:.08em;
+    text-transform:uppercase; color:var(--accent); }
+  #title span { color:var(--dim); font-weight:600; margin-left:.5em; }
+  #wrap { flex:1; min-height:0; display:flex; align-items:center; margin:10px 0; }
+  #list { list-style:none; margin:0; padding:0; width:100%; font-weight:650; line-height:1.14; letter-spacing:-.01em; }
+  #list li { padding:.36em 0; border-top:1px solid var(--line); }
+  #list li:first-child { border-top:0; }
+  #next { flex:none; font-size:16px; color:var(--dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #next b { color:var(--fg); font-weight:600; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="bar"></div>
+  <div id="top"><span id="count"></span><span id="clock">0:00</span></div>
+  <h1 id="title"></h1>
+  <div id="wrap"><ul id="list"></ul></div>
+  <div id="next"></div>
+</div>
+<script>
+(function () {
+  var CARDS = [
+    { s: "Open", p: "1/2", l: [
+      "Thanks: Mahibere Kidusan, everyone, God",
+      "Last time: freshman year, church back home",
+      "“Safe career?” I said CS",
+      "Not for the nap pods",
+      "The world runs on software" ] },
+    { s: "Open", p: "2/2", l: [
+      "Now computers speak English",
+      "No safe career. Nobody can name one.",
+      "It’s real. Not your fault.",
+      "Excuses, or what’s in your control" ] },
+    { s: "My story", p: "1/2", l: [
+      "Riskier career than most",
+      "Google: return offer, NYC, AI search",
+      "Deposit paid",
+      "Startup: first six, paid almost nothing",
+      "Advisor: go with Google" ] },
+    { s: "My story", p: "2/2", l: [
+      "Backed out two months before",
+      "Took a leave from school",
+      "“Imagine telling Habesha parents”",
+      "Today: my own company, $2.6M",
+      "These principles = what I hire for" ] },
+    { s: "1 · Bias toward action", p: "1/2", l: [
+      "Don’t think your way. Do your way.",
+      "People weigh options, dip a toe",
+      "Build it, launch it, send the email",
+      "I hire the one who’s tried things" ] },
+    { s: "1 · Bias toward action", p: "2/2", l: [
+      "Cardboard, robotics, apps, games",
+      "Didn’t know where it led",
+      "It became my lore. Investors like stories.",
+      "You could: build something small",
+      "Reach out to 5 people",
+      "Team up. Stay moving." ] },
+    { s: "2 · Signal over noise", p: "1/2", l: [
+      "Acting gives info. Now sort it.",
+      "Noise: TikTok, headlines, layoffs, “AI is killing…”",
+      "Signal: a reply, a hiring manager’s words, a rejection, a user’s reaction",
+      "Signal = your next move" ] },
+    { s: "2 · Signal over noise", p: "2/2", l: [
+      "Noise is where excuses come from",
+      "My next 7 days, month, year",
+      "Protects headspace and focus",
+      "No signal? Haven’t done enough.",
+      "The jungle" ] },
+    { s: "3 · Make work visible", p: "1/2", l: [
+      "Half the game: who knows what you’re doing",
+      "Not posting everything. Being ready.",
+      "30 sec: working on, learned, want",
+      "You never know who opens the door" ] },
+    { s: "3 · Make work visible", p: "2/2", l: [
+      "Stanford class, top project",
+      "LinkedIn post. People reached out.",
+      "Kept building: V2, V3",
+      "Meetings, bigger, investors, $2.6M",
+      "Not planned. One step at a time." ] },
+    { s: "4 · Intelligence on tap", p: "1/2", l: [
+      "The scary thing works for you too",
+      "Most companies use it badly",
+      "That’s your opening",
+      "Faster, cheaper, or new" ] },
+    { s: "4 · Intelligence on tap", p: "2/2", l: [
+      "Growth hire, no technical background",
+      "Hired him: he posted what he built",
+      "User feedback → shipped it himself",
+      "I gave him bigger things",
+      "Stay on top. Real value." ] },
+    { s: "Tie it together", p: "", l: [
+      "Habits of a good founder",
+      "That’s who I hire",
+      "Not “fingers crossed”",
+      "Why you over the next person?",
+      "Proof over pedigree" ] },
+    { s: "Close", p: "", l: [
+      "Back to that startup",
+      "A year of eating glass",
+      "No perfect plan. God’s plan was greater.",
+      "“A moving man meets his luck”",
+      "Luck is everywhere. Moving finds it.",
+      "Go move. Thank you." ] }
+  ];
+
+  var bar = document.getElementById("bar"), count = document.getElementById("count"),
+      clock = document.getElementById("clock"), title = document.getElementById("title"),
+      wrap = document.getElementById("wrap"), list = document.getElementById("list"),
+      next = document.getElementById("next");
+  var i = 0, started = 0, lock = null;
+
+  try { var saved = parseInt(sessionStorage.getItem("card"), 10); if (saved >= 0 && saved < CARDS.length) i = saved;
+        started = parseInt(sessionStorage.getItem("t0"), 10) || 0; } catch (e) {}
+
+  CARDS.forEach(function () { bar.appendChild(document.createElement("i")); });
+
+  function fit() {
+    var size = Math.min(window.innerWidth * 0.105, 64);
+    list.style.fontSize = size + "px";
+    while (size > 18 && list.offsetHeight > wrap.clientHeight) { size -= 1; list.style.fontSize = size + "px"; }
+  }
+
+  function render() {
+    var c = CARDS[i];
+    title.textContent = c.s;
+    if (c.p) { var sp = document.createElement("span"); sp.textContent = c.p; title.appendChild(sp); }
+    list.textContent = "";
+    c.l.forEach(function (t) { var li = document.createElement("li"); li.textContent = t; list.appendChild(li); });
+    count.textContent = (i + 1) + " / " + CARDS.length;
+    next.textContent = "";
+    if (i < CARDS.length - 1) {
+      var n = CARDS[i + 1];
+      next.appendChild(document.createTextNode("Next: "));
+      var b = document.createElement("b");
+      b.textContent = n.s === c.s ? n.l[0] : n.s;
+      next.appendChild(b);
+    } else { next.textContent = "End"; }
+    Array.prototype.forEach.call(bar.children, function (el, k) { el.className = k < i ? "done" : k === i ? "on" : ""; });
+    fit();
+    try { sessionStorage.setItem("card", i); sessionStorage.setItem("t0", started); } catch (e) {}
+  }
+
+  function tick() {
+    if (!started) { clock.textContent = "0:00"; return; }
+    var s = Math.floor((Date.now() - started) / 1000);
+    clock.textContent = Math.floor(s / 60) + ":" + ("0" + (s % 60)).slice(-2);
+  }
+
+  function awake() {
+    if (!("wakeLock" in navigator) || lock) return;
+    navigator.wakeLock.request("screen").then(function (l) { lock = l; l.addEventListener("release", function () { lock = null; }); }).catch(function () {});
+  }
+
+  function go(d) {
+    var j = Math.max(0, Math.min(CARDS.length - 1, i + d));
+    if (j === i) return;
+    i = j;
+    if (i === 0) started = 0; else if (!started) started = Date.now();
+    render(); tick();
+  }
+
+  document.addEventListener("click", function (e) { awake(); go(e.clientX < window.innerWidth * 0.33 ? -1 : 1); });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "ArrowRight" || e.key === " ") go(1);
+    if (e.key === "ArrowLeft") go(-1);
+  });
+  document.addEventListener("visibilitychange", function () { if (!document.hidden && started) awake(); });
+  window.addEventListener("resize", fit);
+  setInterval(tick, 1000);
+  window.__notes = { go: go, cards: CARDS, at: function () { return i; } };
+  render(); tick();
+})();
+</script>
+</body>
+</html>
