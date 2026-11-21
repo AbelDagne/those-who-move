@@ -30,6 +30,7 @@ svg#w{position:absolute;left:0;top:0;width:1920px;height:1080px;overflow:visible
 #vig{position:absolute;inset:0;background:radial-gradient(ellipse 75% 70% at 50% 48%,rgba(0,0,0,0) 55%,rgba(0,0,0,.6) 100%);pointer-events:none}
 #dip{position:absolute;inset:0;background:#000;opacity:0;pointer-events:none}
 #hint{position:absolute;right:44px;bottom:30px;font-size:15px;font-weight:600;letter-spacing:.2em;color:rgba(214,214,214,.42);text-transform:uppercase;transition:opacity 1s}
+#count.on::before{content:'';display:inline-block;width:7px;height:7px;border-radius:50%;background:rgba(110,220,140,.6);margin-right:12px;vertical-align:1px}
 #count{position:absolute;right:44px;top:34px;font-size:14px;font-weight:600;letter-spacing:.2em;color:rgba(214,214,214,.28);font-variant-numeric:tabular-nums}
 </style>
 </head>
@@ -326,7 +327,7 @@ T[0].play(0);if(h0>1)go(h0-1,true);label();
 /* ---------- remote: the phone notes page sends slide changes through a relay ---------- */
 try{const RU='https://ntfy.sh/twm-af10d0de88af6159';
   const say=()=>{try{fetch(RU,{method:'POST',body:JSON.stringify({t:'state',n:cur,of:N})}).catch(()=>{})}catch(e){}};
-  const es=new EventSource(RU+'/sse');es.onopen=say;
+  const es=new EventSource(RU+'/sse');es.onopen=()=>{$('count').classList.add('on');say()};es.onerror=()=>$('count').classList.remove('on');
   es.onmessage=e=>{let m;try{m=JSON.parse(JSON.parse(e.data).message)}catch(x){return}
     if(m.t==='go'&&typeof m.n==='number')go(m.n);else if(m.t==='step'&&(m.d===1||m.d===-1))go(cur+m.d);else if(m.t!=='ping')return;
     setTimeout(say,350)};

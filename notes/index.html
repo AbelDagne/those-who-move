@@ -186,29 +186,45 @@
   /* ---- clicker: each card belongs to one slide on the big screen ---- */
   var SLIDE = [0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5];
   var RU = "https://ntfy.sh/twm-af10d0de88af6159";
-  var remote = document.getElementById("remote"), rt = document.getElementById("rt"), waitT = null;
-  function send(m) {
-    clearTimeout(waitT);
-    waitT = setTimeout(function () { remote.className = "bad"; rt.textContent = "no screen"; }, 5000);
-    try { fetch(RU, { method: "POST", body: JSON.stringify(m), keepalive: true }).catch(function () {}); } catch (e) {}
+  var remote = document.getElementById("remote"), rt = document.getElementById("rt");
+  var want = null, tries = 0, retryT = null, debT = null;
+  function post(m) { try { fetch(RU, { method: "POST", body: JSON.stringify(m), keepalive: true }).catch(function () {}); } catch (e) {} }
+  function show(cls, txt) { remote.className = cls; rt.textContent = txt; }
+  function push() {               /* send the wanted slide, and keep trying until a screen confirms it */
+    clearTimeout(retryT); retryT = null;
+    if (want === null) return;
+    if (tries >= 4) { show("bad", "no screen"); return; }
+    tries++; post({ t: "go", n: want });
+    retryT = setTimeout(push, 2500);
+  }
+  function sync(n, now) {         /* make every open screen show slide n */
+    want = n; tries = 0; show("", "syncing");
+    clearTimeout(debT); clearTimeout(retryT); retryT = null;
+    debT = setTimeout(function () { debT = null; push(); }, now ? 0 : 250);
+  }
+  function step(d) {              /* manual clicker: move the screen without moving the notes */
+    want = null; clearTimeout(debT); clearTimeout(retryT);
+    show("", "syncing"); post({ t: "step", d: d });
+    retryT = setTimeout(function () { show("bad", "no screen"); }, 5000);
   }
   try {
     var es = new EventSource(RU + "/sse");
-    es.onopen = function () { send({ t: "ping" }); };
+    es.onopen = function () { sync(SLIDE[i], true); };
     es.onmessage = function (e) {
       var m; try { m = JSON.parse(JSON.parse(e.data).message); } catch (x) { return; }
       if (m.t !== "state") return;
-      clearTimeout(waitT); remote.className = "ok"; rt.textContent = "slide " + (m.n + 1);
+      if (want === null || m.n === want) { clearTimeout(retryT); retryT = null; show("ok", "slide " + (m.n + 1)); }
+      else if (!retryT && !debT) push();
     };
   } catch (e) {}
-  document.getElementById("rp").addEventListener("click", function () { send({ t: "step", d: -1 }); });
-  document.getElementById("rn").addEventListener("click", function () { send({ t: "step", d: 1 }); });
-  document.getElementById("rs").addEventListener("click", function () { send({ t: "go", n: SLIDE[i] }); });
+  document.getElementById("rp").addEventListener("click", function () { step(-1); });
+  document.getElementById("rn").addEventListener("click", function () { step(1); });
+  document.getElementById("rs").addEventListener("click", function () { sync(SLIDE[i], true); });
 
   function go(d) {
     var j = Math.max(0, Math.min(CARDS.length - 1, i + d));
     if (j === i) return;
-    if (SLIDE[j] !== SLIDE[i]) send({ t: "go", n: SLIDE[j] });
+    if (SLIDE[j] !== SLIDE[i]) sync(SLIDE[j]);
     i = j;
     if (i === 0) started = 0; else if (!started) started = Date.now();
     render(); tick();
