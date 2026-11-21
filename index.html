@@ -324,13 +324,36 @@ addEventListener('click',e=>{go(e.clientX<innerWidth/2?cur-1:cur+1)});
 let idle;addEventListener('mousemove',()=>{document.body.classList.remove('idle');clearTimeout(idle);idle=setTimeout(()=>document.body.classList.add('idle'),1800)});
 const h0=parseInt((location.hash||'').slice(1),10);
 T[0].play(0);if(h0>1)go(h0-1,true);label();
-/* ---------- remote: the phone notes page sends slide changes through a relay ---------- */
-try{const RU='https://ntfy.sh/twm-af10d0de88af6159';
-  const say=()=>{try{fetch(RU,{method:'POST',body:JSON.stringify({t:'state',n:cur,of:N})}).catch(()=>{})}catch(e){}};
-  const es=new EventSource(RU+'/sse');es.onopen=()=>{$('count').classList.add('on');say()};es.onerror=()=>$('count').classList.remove('on');
-  es.onmessage=e=>{let m;try{m=JSON.parse(JSON.parse(e.data).message)}catch(x){return}
-    if(m.t==='go'&&typeof m.n==='number')go(m.n);else if(m.t==='step'&&(m.d===1||m.d===-1))go(cur+m.d);else if(m.t!=='ping')return;
-    setTimeout(say,350)};
+/* ---------- remote: the phone notes page sends slide changes over two public message brokers ---------- */
+try{
+function mqtt(url,topic,onmsg,onstate){
+  const E=new TextEncoder(),D=new TextDecoder();let ws=null,up=false,ka=null,buf=new Uint8Array(0);
+  const s=x=>{const b=E.encode(x),o=new Uint8Array(b.length+2);o[0]=b.length>>8;o[1]=b.length&255;o.set(b,2);return o};
+  const pk=(h,parts)=>{let n=0;parts.forEach(p=>n+=p.length);const rl=[];let x=n;do{let d=x%128;x=(x-d)/128;if(x>0)d|=128;rl.push(d)}while(x>0);
+    const o=new Uint8Array(1+rl.length+n);o[0]=h;o.set(rl,1);let k=1+rl.length;parts.forEach(p=>{o.set(p,k);k+=p.length});return o};
+  const down=()=>{clearInterval(ka);if(up){up=false;onstate(false)}};
+  const feed=chunk=>{const m=new Uint8Array(buf.length+chunk.length);m.set(buf);m.set(chunk,buf.length);buf=m;
+    for(;;){if(buf.length<2)return;let len=0,mul=1,i=1,d;do{if(i>=buf.length)return;d=buf[i++];len+=(d&127)*mul;mul*=128}while(d&128);
+      if(buf.length<i+len)return;const h=buf[0],body=buf.slice(i,i+len);buf=buf.slice(i+len);const t=h>>4;
+      if(t===2){if(body[1]===0)ws.send(pk(0x82,[new Uint8Array([0,1]),s(topic),new Uint8Array([0])]));else ws.close()}
+      else if(t===9){up=true;clearInterval(ka);ka=setInterval(()=>{try{ws.send(new Uint8Array([0xC0,0]))}catch(e){}},20000);onstate(true)}
+      else if(t===3){const tl=(body[0]<<8)|body[1];let off=2+tl;if(h&6)off+=2;onmsg(D.decode(body.subarray(off)))}}};
+  const open=()=>{try{ws=new WebSocket(url,'mqtt')}catch(e){setTimeout(open,3000);return}
+    ws.binaryType='arraybuffer';buf=new Uint8Array(0);const me=ws;
+    ws.onopen=()=>me.send(pk(0x10,[s('MQTT'),new Uint8Array([4,2,0,45]),s('twm'+Math.random().toString(36).slice(2,12))]));
+    ws.onmessage=e=>feed(new Uint8Array(e.data));
+    ws.onclose=()=>{down();setTimeout(open,1500)};ws.onerror=()=>{try{me.close()}catch(e){}}};
+  open();
+  return {send:x=>{if(up){try{ws.send(pk(0x30,[s(topic),E.encode(x)]));return true}catch(e){}}return false},get up(){return up}};
+}
+const BROKERS=['wss://broker.emqx.io:8084/mqtt','wss://test.mosquitto.org:8081/mqtt','wss://broker.hivemq.com:8884/mqtt'],TOPIC='those-who-move/af10d0de88af6159';
+const seen={};let links=[];
+const dot=()=>$('count').classList.toggle('on',links.some(l=>l.up));
+const say=()=>{const m=JSON.stringify({t:'state',n:cur,of:N});links.forEach(l=>l.send(m))};
+const heard=x=>{let m;try{m=JSON.parse(x)}catch(e){return}if(!m||m.t==='state')return;if(m.id){if(seen[m.id])return;seen[m.id]=1}
+  if(m.t==='go'&&typeof m.n==='number')go(m.n);else if(m.t==='step'&&(m.d===1||m.d===-1))go(cur+m.d);else if(m.t!=='ping')return;
+  setTimeout(say,300)};
+links=BROKERS.map(u=>mqtt(u,TOPIC,heard,ok=>{dot();if(ok)say()}));
 }catch(e){}
 window.__show={go:go,cam:cam,T:T,get cur(){return cur}};
 })();
