@@ -323,6 +323,14 @@ addEventListener('click',e=>{go(e.clientX<innerWidth/2?cur-1:cur+1)});
 let idle;addEventListener('mousemove',()=>{document.body.classList.remove('idle');clearTimeout(idle);idle=setTimeout(()=>document.body.classList.add('idle'),1800)});
 const h0=parseInt((location.hash||'').slice(1),10);
 T[0].play(0);if(h0>1)go(h0-1,true);label();
+/* ---------- remote: the phone notes page sends slide changes through a relay ---------- */
+try{const RU='https://ntfy.sh/twm-af10d0de88af6159';
+  const say=()=>{try{fetch(RU,{method:'POST',body:JSON.stringify({t:'state',n:cur,of:N})}).catch(()=>{})}catch(e){}};
+  const es=new EventSource(RU+'/sse');es.onopen=say;
+  es.onmessage=e=>{let m;try{m=JSON.parse(JSON.parse(e.data).message)}catch(x){return}
+    if(m.t==='go'&&typeof m.n==='number')go(m.n);else if(m.t==='step'&&(m.d===1||m.d===-1))go(cur+m.d);else if(m.t!=='ping')return;
+    setTimeout(say,350)};
+}catch(e){}
 window.__show={go:go,cam:cam,T:T,get cur(){return cur}};
 })();
 </script>

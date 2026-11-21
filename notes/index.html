@@ -29,6 +29,14 @@
   #list { list-style:none; margin:0; padding:0; width:100%; font-weight:650; line-height:1.14; letter-spacing:-.01em; }
   #list li { padding:.36em 0; border-top:1px solid var(--line); }
   #list li:first-child { border-top:0; }
+  #remote { display:flex; align-items:center; gap:2px; margin:-12px 0; }
+  #remote button { appearance:none; -webkit-appearance:none; background:none; border:0; color:var(--dim);
+    font:inherit; font-size:15px; padding:12px 14px; letter-spacing:.04em; }
+  #remote #rp, #remote #rn { font-size:22px; line-height:15px; color:var(--fg); }
+  #remote button:active { color:var(--accent); }
+  #dot { display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--dim); margin-right:6px; vertical-align:1px; }
+  #remote.ok #dot { background:#4cd964; }
+  #remote.bad #dot { background:#ff453a; }
   #next { flex:none; font-size:16px; color:var(--dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   #next b { color:var(--fg); font-weight:600; }
 </style>
@@ -36,7 +44,7 @@
 <body>
 <div id="app">
   <div id="bar"></div>
-  <div id="top"><span id="count"></span><span id="clock">0:00</span></div>
+  <div id="top"><span id="count"></span><span id="remote"><button id="rp" aria-label="Previous slide on screen">&#8249;</button><button id="rs" aria-label="Check screen connection"><i id="dot"></i><span id="rt">screen</span></button><button id="rn" aria-label="Next slide on screen">&#8250;</button></span><span id="clock">0:00</span></div>
   <h1 id="title"></h1>
   <div id="wrap"><ul id="list"></ul></div>
   <div id="next"></div>
@@ -175,15 +183,38 @@
     navigator.wakeLock.request("screen").then(function (l) { lock = l; l.addEventListener("release", function () { lock = null; }); }).catch(function () {});
   }
 
+  /* ---- clicker: each card belongs to one slide on the big screen ---- */
+  var SLIDE = [0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5];
+  var RU = "https://ntfy.sh/twm-af10d0de88af6159";
+  var remote = document.getElementById("remote"), rt = document.getElementById("rt"), waitT = null;
+  function send(m) {
+    clearTimeout(waitT);
+    waitT = setTimeout(function () { remote.className = "bad"; rt.textContent = "no screen"; }, 5000);
+    try { fetch(RU, { method: "POST", body: JSON.stringify(m), keepalive: true }).catch(function () {}); } catch (e) {}
+  }
+  try {
+    var es = new EventSource(RU + "/sse");
+    es.onopen = function () { send({ t: "ping" }); };
+    es.onmessage = function (e) {
+      var m; try { m = JSON.parse(JSON.parse(e.data).message); } catch (x) { return; }
+      if (m.t !== "state") return;
+      clearTimeout(waitT); remote.className = "ok"; rt.textContent = "slide " + (m.n + 1);
+    };
+  } catch (e) {}
+  document.getElementById("rp").addEventListener("click", function () { send({ t: "step", d: -1 }); });
+  document.getElementById("rn").addEventListener("click", function () { send({ t: "step", d: 1 }); });
+  document.getElementById("rs").addEventListener("click", function () { send({ t: "go", n: SLIDE[i] }); });
+
   function go(d) {
     var j = Math.max(0, Math.min(CARDS.length - 1, i + d));
     if (j === i) return;
+    if (SLIDE[j] !== SLIDE[i]) send({ t: "go", n: SLIDE[j] });
     i = j;
     if (i === 0) started = 0; else if (!started) started = Date.now();
     render(); tick();
   }
 
-  document.addEventListener("click", function (e) { awake(); go(e.clientX < window.innerWidth * 0.33 ? -1 : 1); });
+  document.addEventListener("click", function (e) { awake(); if (e.target.closest && e.target.closest("#remote")) return; go(e.clientX < window.innerWidth * 0.33 ? -1 : 1); });
   document.addEventListener("keydown", function (e) {
     if (e.key === "ArrowRight" || e.key === " ") go(1);
     if (e.key === "ArrowLeft") go(-1);
